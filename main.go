@@ -1,9 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -13,7 +15,10 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
+
 
 type termData struct {
 	Count   int      `json:"totalCount"`
@@ -21,63 +26,350 @@ type termData struct {
 }
 
 type course struct {
-	ID              int               `json:"id"`
-	Ref             string            `json:"courseReferenceNumber"`
-	Number          string            `json:"courseNumber"`
-	Subject         string            `json:"subject"`
-	Type            string            `json:"scheduleTypeDescription"`
-	Title           string            `json:"courseTitle"`
-	DescriptionUrl  string            `json:""`
-	Description     string            `json:""`
-	Credits         float32           `json:"creditHours"`
-	MaxEnrollment   int               `json:"maximumEnrollment"`
-	Enrolled        int               `json:"enrollment"`
-	Availability    int               `json:"seatsAvailable"`
+	ID              int               `json:"id" db:"courseId"`
+	Ref             string            `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	Number          string            `json:"courseNumber" db:"courseNumber"`
+	Subject         string            `json:"subject" db:"subject"`
+	Type            string            `json:"scheduleTypeDescription" db:"scheduleTypeDescription"`
+	Title           string            `json:"courseTitle" db:"courseTitle"`
+	DescriptionUrl  string            `json:"" db:"descriptionUrl"`
+	Description     string            `json:"" db:"description"`
+	Credits         float32            `json:"creditHours" db:"creditHours"`
+	MaxEnrollment   int               `json:"maximumEnrollment" db:"maximumEnrollment"`
+	Enrolled        int               `json:"enrollment" db:"enrollment"`
+	Availability    int               `json:"seatsAvailable" db:"seatsAvailable"`
 	Faculty         []faculty         `json:"faculty"`
 	MeetingsFaculty []meetingsFaculty `json:"meetingsFaculty"`
 	Attributes      []attribute       `json:"sectionAttributes"`
 }
 
 type faculty struct {
-	ID    string `json:"bannerId"`
-	Ref   string `json:"courseReferenceNumber"`
-	Name  string `json:"displayName"`
-	Email string `json:"emailAddress"`
+	ID    string `json:"bannerId" db:"bannerId"`
+	Ref   string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	Name  string `json:"displayName" db:"displayName"`
+	Email string `json:"emailAddress" db:"emailAddress"`
 }
 
 type meetingsFaculty struct {
-	Section     string `json:"category"`
-	Ref         string `json:"courseReferenceNumber"`
+	Section     string `json:"category" db:"category"`
+	Ref         string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
 	MeetingTime meetingTime
 }
 
 type meetingTime struct {
-	Begin         string  `json:"beginTime"`
-	BuildingShort string  `json:"building"`
-	BuildingLong  string  `json:"buildingDescription"`
-	Room          string  `json:"room"`
-	Section       string  `json:"category"`
-	Ref           string  `json:"courseReferenceNumber"`
-	EndDate       string  `json:"endDate"`
-	EndTime       string  `json:"endTime"`
-	StartDate     string  `json:"startDate"`
-	Hours         float32 `json:"hoursWeek"`
-	TypeShort     string  `json:"meetingType"`
-	TypeLong      string  `json:"meetingTypeDescription"`
-	Monday        bool    `json:"monday"`
-	Tuesday       bool    `json:"tuesday"`
-	Wednesday     bool    `json:"wednesday"`
-	Thursday      bool    `json:"thursday"`
-	Friday        bool    `json:"friday"`
-	Saturday      bool    `json:"saturday"`
-	Sunday        bool    `json:"sunday"`
+	Begin         string  `json:"beginTime" db:"beginTime"`
+	BuildingShort string  `json:"building" db:"building"`
+	BuildingLong  string  `json:"buildingDescription" db:"buildingDescription"`
+	Room          string  `json:"room" db:"room"`
+	Section       string  `json:"category" db:"category"`
+	Ref           string  `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	EndDate       string  `json:"endDate" db:"endDate"`
+	EndTime       string  `json:"endTime" db:"endTime"`
+	StartDate     string  `json:"startDate" db:"startDate"`
+	Hours         float32  `json:"hoursWeek" db:"hoursWeek"`
+	TypeShort     string  `json:"meetingType" db:"meetingType"`
+	TypeLong      string  `json:"meetingTypeDescription" db:"meetingTypeDescription"`
+	Monday        bool    `json:"monday" db:"monday"`
+	Tuesday       bool    `json:"tuesday" db:"tuesday"`
+	Wednesday     bool    `json:"wednesday" db:"wednesday"`
+	Thursday      bool    `json:"thursday" db:"thursday"`
+	Friday        bool    `json:"friday" db:"friday"`
+	Saturday      bool    `json:"saturday" db:"saturday"`
+	Sunday        bool    `json:"sunday" db:"sunday"`
 }
 
 type attribute struct {
-	CodeShort string `json:"code"`
-	CodeLong  string `json:"description"`
-	Ref       string `json:"courseReferenceNumber"`
+	CodeShort string `json:"code" db:"code`
+	CodeLong  string `json:"description" db:"description`
+	Ref       string `json:"courseReferenceNumber" db:"courseReferenceNumber`
 }
+
+type attribute_list struct{
+	attributes []attribute  
+}
+
+
+func load_envs (){
+	// load .env file
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+	
+	var	host     = os.Getenv("HOST")
+	var	port     = 5432
+	var	user     = os.Getenv("SQL_USER")
+	var	password = os.Getenv("PASS")
+	var	dbname   = os.Getenv("DBNAME")
+
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
+    host, port, user, password, dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Successfully connected to DB!")
+}
+
+func send_to_db(data termData){
+
+	var MeetingTimeID int;
+	var MeetingsFacultyID int;
+	var facultyID int;
+	var courseID int;
+	var sectionAttributeID int;
+
+	// load .env file
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+	
+	var	host     = os.Getenv("HOST")
+	var	port     = 5432
+	var	user     = os.Getenv("SQL_USER")
+	var	password = os.Getenv("PASS")
+	var	dbname   = os.Getenv("DBNAME")
+
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password,dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+
+	//db, err := sqlx.Connect("postgres", psqlInfo)
+	
+	if err != nil {
+		panic(err)
+	}
+	
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Successfully connected to DB!")
+
+	for k := range data.Courses {
+		//FACULTY
+		if(len(data.Courses[k].Faculty) > 0){
+			facultyID = 0
+			sqlStatement1 := `INSERT INTO "Faculty" ("bannerId", 
+													"courseReferenceNumber", 
+													"displayName", 
+													"emailAddress")
+
+													VALUES ($1,
+															$2,
+															$3,
+															$4
+															) RETURNING id;`
+								
+			err := db.QueryRow(sqlStatement1,
+				data.Courses[k].Faculty[0].ID,
+				data.Courses[k].Faculty[0].Ref ,
+				data.Courses[k].Faculty[0].Name ,
+				data.Courses[k].Faculty[0].Email).Scan(&facultyID)
+			if err != nil {
+				panic(err)
+			}	
+			
+			//fmt.Print("THINGS: ", facultyId)
+		}
+
+		//MEETING TIME
+		if(len(data.Courses[k].MeetingsFaculty) > 0){
+			MeetingTimeID = 0
+			sqlStatement2 := `INSERT INTO "MeetingTime" ("beginTime", 
+														"building", 
+														"buildingDescription", 
+														"room",
+														"category",               
+														"courseReferenceNumber",  
+														"endDate",                
+														"endTime",                
+														"startDate",              
+														"hoursWeek",           
+														"meetingType",            
+														"meetingTypeDescription", 
+														"monday",                 
+														"tuesday",                
+														"wednesday",              
+														"thursday",               
+														"friday",                 
+														"saturday",               
+														"sunday")
+
+
+											VALUES ($1,
+													$2,
+													$3,
+													$4,
+													$5,
+													$6,
+													$7,
+													$8,
+													$9,
+													$10,
+													$11,
+													$12,
+													$13,
+													$14,
+													$15,
+													$16,
+													$17,
+													$18,
+													$19
+													) RETURNING id;`
+								
+			err := db.QueryRow(sqlStatement2,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Begin,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.BuildingShort ,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.BuildingLong ,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Room,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Section,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Ref,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.EndDate,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.EndTime,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.StartDate,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Hours,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.TypeShort,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.TypeLong,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Monday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Tuesday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Wednesday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Thursday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Friday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Saturday,
+				data.Courses[k].MeetingsFaculty[0].MeetingTime.Sunday,
+				
+				).Scan(&MeetingTimeID)
+			if err != nil {
+				panic(err)
+			}	
+			
+		}
+
+		//Meetings Faculty
+		if(len(data.Courses[k].MeetingsFaculty) > 0){
+			MeetingsFacultyID = 0
+			sqlStatement2 := `INSERT INTO "MeetingsFaculty" ("category", 
+															 "courseReferenceNumber",
+															 "meetingTimeID")
+
+
+													VALUES ($1,
+															$2,
+															$3) RETURNING id;`
+								
+			err := db.QueryRow(sqlStatement2,
+				data.Courses[k].MeetingsFaculty[0].Section,
+				data.Courses[k].MeetingsFaculty[0].Ref ,
+				MeetingTimeID,
+				).Scan(&MeetingsFacultyID)
+			if err != nil {
+				panic(err)
+			}	
+		}
+
+
+		//Full Course insert
+		courseID = 0
+		sqlStatement2 := `INSERT INTO "Course"("courseId",                
+													"courseReferenceNumber",   
+													"courseNumber",            
+													"subject",                 
+													"scheduleTypeDescription", 
+													"courseTitle",             
+													"descriptionUrl",          
+													"description",             
+													"creditHours",             
+													"maximumEnrollment",       
+													"enrollment",              
+													"seatsAvailable",          
+													"facultyId",               
+													"facultyMeetId"                                         
+													)
+
+
+										VALUES ($1,
+												$2,
+												$3,
+												$4,
+												$5,
+												$6,
+												$7,
+												$8,
+												$9,
+												$10,
+												$11,
+												$12,
+												$13,
+												$14
+												) RETURNING id;`
+							
+		err := db.QueryRow(sqlStatement2,
+			data.Courses[k].ID,
+			data.Courses[k].Ref ,
+			data.Courses[k].Number ,
+			data.Courses[k].Subject,
+			data.Courses[k].Type,
+			data.Courses[k].Title,
+			data.Courses[k].DescriptionUrl,
+			data.Courses[k].Description,
+			data.Courses[k].Credits,
+			data.Courses[k].MaxEnrollment,
+			data.Courses[k].Enrolled,
+			data.Courses[k].Availability,
+			facultyID,
+			MeetingsFacultyID,
+			).Scan(&courseID)
+		if err != nil {
+			panic(err)
+		}	
+
+
+		//Attributes
+		if(len(data.Courses[k].Attributes) > 0){
+			sectionAttributeID = 0
+			sqlStatement2 := `INSERT INTO "sectionAttribute" ("code", 
+															 "description",
+															 "courseReferenceNumber",
+															 "courseId")
+
+
+													VALUES ($1,
+															$2,
+															$3,
+															$4 ) RETURNING id;`
+								
+			err := db.QueryRow(sqlStatement2,
+				data.Courses[k].Attributes[0].CodeShort,
+				data.Courses[k].Attributes[0].CodeLong ,
+				data.Courses[k].Attributes[0].Ref ,
+				courseID,
+				).Scan(&sectionAttributeID)
+			if err != nil {
+				panic(err)
+			}	
+		}
+			
+
+
+		time.Sleep(100 * time.Millisecond) 
+	}
+}
+
 
 func timer(name string) func() {
 	start := time.Now()
@@ -189,6 +481,8 @@ func main() {
 	var semester, year string
 	var wg sync.WaitGroup
 
+	//load_envs()
+
 	fmt.Print("Enter your semester (i.e. fall): ")
 	fmt.Scan(&semester)
 
@@ -278,6 +572,9 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	send_to_db(data)
+	
 
 	err = os.WriteFile("courses.json", output, 0644)
 
