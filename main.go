@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
+
 	_ "github.com/lib/pq"
 )
 
@@ -41,6 +43,9 @@ type course struct {
 	Faculty         []faculty         `json:"faculty"`
 	MeetingsFaculty []meetingsFaculty `json:"meetingsFaculty"`
 	Attributes      []attribute       `json:"sectionAttributes"`
+	Year  string `db:"year"`
+	FacultyID int	`db:"facultyId"`
+	FacultyMeetID int `db:"facultyMeetId"`
 }
 
 type faculty struct {
@@ -48,12 +53,15 @@ type faculty struct {
 	Ref   string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
 	Name  string `json:"displayName" db:"displayName"`
 	Email string `json:"emailAddress" db:"emailAddress"`
+	Year  string `db:"year"`
 }
 
 type meetingsFaculty struct {
 	Section     string `json:"category" db:"category"`
 	Ref         string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
-	MeetingTime meetingTime
+	Year  string `db:"year"`
+	MeetingTimeID int `db:"meetingTimeID"`
+	MeetingTime meetingTime	
 }
 
 type meetingTime struct {
@@ -76,12 +84,15 @@ type meetingTime struct {
 	Friday        bool    `json:"friday" db:"friday"`
 	Saturday      bool    `json:"saturday" db:"saturday"`
 	Sunday        bool    `json:"sunday" db:"sunday"`
+	Year  string `db:"year"`
 }
 
 type attribute struct {
-	CodeShort string `json:"code" db:"code`
-	CodeLong  string `json:"description" db:"description`
-	Ref       string `json:"courseReferenceNumber" db:"courseReferenceNumber`
+	CodeShort string `json:"code" db:"code"`
+	CodeLong  string `json:"description" db:"description"`
+	Ref       string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	Year  string `db:"year"`
+	CourseID int `db:"courseId"`
 }
 
 type attribute_list struct{
@@ -120,13 +131,24 @@ func load_envs (){
 	fmt.Println("Successfully connected to DB!")
 }
 
-func send_to_db(data termData){
-
+func send_to_db(data termData,semester string){
 	var MeetingTimeID int;
 	var MeetingsFacultyID int;
 	var facultyID int;
 	var courseID int;
 	var sectionAttributeID int;
+	var yearString string;
+
+	t := time.Now()
+	year := t.Year()   // type int
+
+	if(strings.ToLower(semester) == "fall"){
+		yearString  = "F" + strconv.Itoa(year) 
+	}else{
+		yearString  = "S" + strconv.Itoa(year) 
+	}
+	
+	//var output int;
 
 	// load .env file
 	err := godotenv.Load(".env")
@@ -141,15 +163,13 @@ func send_to_db(data termData){
 	var	password = os.Getenv("PASS")
 	var	dbname   = os.Getenv("DBNAME")
 
-
+	
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password,dbname)
-	db, err := sql.Open("postgres", psqlInfo)
+	//db, err := sql.Open("postgres", psqlInfo)
 
 	//db, err := sqlx.Connect("postgres", psqlInfo)
-	
-	if err != nil {
-		panic(err)
-	}
+	db := sqlx.MustConnect("postgres", psqlInfo)
+	db.SetMaxOpenConns(80)
 	
 	defer db.Close()
 
@@ -161,212 +181,253 @@ func send_to_db(data termData){
 	fmt.Println("Successfully connected to DB!")
 
 	for k := range data.Courses {
-		//FACULTY
 		if(len(data.Courses[k].Faculty) > 0){
-			facultyID = 0
-			sqlStatement1 := `INSERT INTO "Faculty" ("bannerId", 
+			query := `INSERT INTO "Faculty"("bannerId", 
 													"courseReferenceNumber", 
 													"displayName", 
-													"emailAddress")
+													"emailAddress",
+													"year")
 
-													VALUES ($1,
-															$2,
-															$3,
-															$4
-															) RETURNING id;`
-								
-			err := db.QueryRow(sqlStatement1,
-				data.Courses[k].Faculty[0].ID,
-				data.Courses[k].Faculty[0].Ref ,
-				data.Courses[k].Faculty[0].Name ,
-				data.Courses[k].Faculty[0].Email).Scan(&facultyID)
-			if err != nil {
-				panic(err)
-			}	
+													VALUES (:bannerId,
+															:courseReferenceNumber,
+															:displayName,
+															:emailAddress,
+															:year) 
+							ON CONFLICT ("courseReferenceNumber")
+							DO UPDATE SET 
+								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress RETURNING id;`
 			
-			//fmt.Print("THINGS: ", facultyId)
+			var data1 faculty = data.Courses[k].Faculty[0]
+			data1.Ref = yearString + data1.Ref;
+			data1.Year = yearString
+
+			rows, err := db.NamedQuery(query, data1)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if rows.Next() {
+				rows.Scan(&facultyID)
+			}
+			rows.Close()
 		}
 
-		//MEETING TIME
+		//Meeting Time
 		if(len(data.Courses[k].MeetingsFaculty) > 0){
 			MeetingTimeID = 0
-			sqlStatement2 := `INSERT INTO "MeetingTime" ("beginTime", 
-														"building", 
-														"buildingDescription", 
-														"room",
-														"category",               
-														"courseReferenceNumber",  
-														"endDate",                
-														"endTime",                
-														"startDate",              
-														"hoursWeek",           
-														"meetingType",            
-														"meetingTypeDescription", 
-														"monday",                 
-														"tuesday",                
-														"wednesday",              
-														"thursday",               
-														"friday",                 
-														"saturday",               
-														"sunday")
+			query := `INSERT INTO "MeetingTime" ("beginTime", 
+												"building", 
+												"buildingDescription", 
+												"room",
+												"category",               
+												"courseReferenceNumber",  
+												"endDate",                
+												"endTime",                
+												"startDate",              
+												"hoursWeek",           
+												"meetingType",            
+												"meetingTypeDescription", 
+												"monday",                 
+												"tuesday",                
+												"wednesday",              
+												"thursday",               
+												"friday",                 
+												"saturday",               
+												"sunday",
+												"year")
 
 
-											VALUES ($1,
-													$2,
-													$3,
-													$4,
-													$5,
-													$6,
-													$7,
-													$8,
-													$9,
-													$10,
-													$11,
-													$12,
-													$13,
-													$14,
-													$15,
-													$16,
-													$17,
-													$18,
-													$19
-													) RETURNING id;`
-								
-			err := db.QueryRow(sqlStatement2,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Begin,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.BuildingShort ,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.BuildingLong ,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Room,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Section,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Ref,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.EndDate,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.EndTime,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.StartDate,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Hours,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.TypeShort,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.TypeLong,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Monday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Tuesday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Wednesday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Thursday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Friday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Saturday,
-				data.Courses[k].MeetingsFaculty[0].MeetingTime.Sunday,
-				
-				).Scan(&MeetingTimeID)
+											VALUES (:beginTime, 
+													:building, 
+													:buildingDescription, 
+													:room,
+													:category,               
+													:courseReferenceNumber,  
+													:endDate,                
+													:endTime,                
+													:startDate,              
+													:hoursWeek,           
+													:meetingType,            
+													:meetingTypeDescription, 
+													:monday,                 
+													:tuesday,                
+													:wednesday,              
+													:thursday,               
+													:friday,                 
+													:saturday,               
+													:sunday,
+													:year)
+							ON CONFLICT ("courseReferenceNumber")
+							DO UPDATE SET 
+								"beginTime" = :beginTime, 
+								"building" = :building, 
+								"buildingDescription" = :buildingDescription, 
+								"room" = :room,
+								"category" = :category,               
+								"courseReferenceNumber" = :courseReferenceNumber,  
+								"endDate" = :endDate,                
+								"endTime" = :endTime,                
+								"startDate" = :startDate,              
+								"hoursWeek" = :hoursWeek,           
+								"meetingType" = :meetingType,            
+								"meetingTypeDescription" = :meetingTypeDescription, 
+								"monday" = :monday,                 
+								"tuesday" = :tuesday,                
+								"wednesday" = :wednesday,              
+								"thursday" = :thursday,               
+								"friday"= :friday,                 
+								"saturday"= :saturday,               
+								"sunday" = :sunday ,
+								"year"= :year
+								RETURNING id;`
+
+
+			var data1 meetingTime = data.Courses[k].MeetingsFaculty[0].MeetingTime
+			data1.Ref = yearString + data1.Ref;
+			data1.Year = yearString
+
+			rows, err := db.NamedQuery(query, data1)
 			if err != nil {
-				panic(err)
-			}	
-			
+				log.Fatalln(err)
+			}
+			if rows.Next() {
+				rows.Scan(&MeetingTimeID)
+			}
+			rows.Close()
 		}
 
-		//Meetings Faculty
+		//Meeting Faculty
 		if(len(data.Courses[k].MeetingsFaculty) > 0){
 			MeetingsFacultyID = 0
-			sqlStatement2 := `INSERT INTO "MeetingsFaculty" ("category", 
-															 "courseReferenceNumber",
-															 "meetingTimeID")
+			query := `INSERT INTO "MeetingsFaculty" ("category", 
+													"courseReferenceNumber",
+													"meetingTimeID",
+													"year")
 
 
-													VALUES ($1,
-															$2,
-															$3) RETURNING id;`
-								
-			err := db.QueryRow(sqlStatement2,
-				data.Courses[k].MeetingsFaculty[0].Section,
-				data.Courses[k].MeetingsFaculty[0].Ref ,
-				MeetingTimeID,
-				).Scan(&MeetingsFacultyID)
+													VALUES (:category,
+															:courseReferenceNumber,
+															:meetingTimeID,
+															:year)
+							ON CONFLICT ("courseReferenceNumber")
+							DO UPDATE SET 
+								"category" = :category, "meetingTimeID"= :meetingTimeID , "year" = :year RETURNING id;`
+			
+			var data1 meetingsFaculty = data.Courses[k].MeetingsFaculty[0]
+			data1.Ref = yearString + data1.Ref;
+			data1.Year = yearString
+			data1.MeetingTimeID = MeetingTimeID
+
+			rows, err := db.NamedQuery(query, data1)
 			if err != nil {
-				panic(err)
-			}	
+				log.Fatalln(err)
+			}
+			if rows.Next() {
+				rows.Scan(&MeetingsFacultyID)
+			}
+			rows.Close()
 		}
 
-
-		//Full Course insert
 		courseID = 0
-		sqlStatement2 := `INSERT INTO "Course"("courseId",                
-													"courseReferenceNumber",   
-													"courseNumber",            
-													"subject",                 
-													"scheduleTypeDescription", 
-													"courseTitle",             
-													"descriptionUrl",          
-													"description",             
-													"creditHours",             
-													"maximumEnrollment",       
-													"enrollment",              
-													"seatsAvailable",          
-													"facultyId",               
-													"facultyMeetId"                                         
-													)
+		query := `INSERT INTO "Course"("courseId",                
+										"courseReferenceNumber",   
+										"courseNumber",            
+										"subject",                 
+										"scheduleTypeDescription", 
+										"courseTitle",             
+										"descriptionUrl",          
+										"description",             
+										"creditHours",             
+										"maximumEnrollment",       
+										"enrollment",              
+										"seatsAvailable",          
+										"facultyId",               
+										"facultyMeetId",
+										"year"                                      
+										)
 
 
-										VALUES ($1,
-												$2,
-												$3,
-												$4,
-												$5,
-												$6,
-												$7,
-												$8,
-												$9,
-												$10,
-												$11,
-												$12,
-												$13,
-												$14
-												) RETURNING id;`
-							
-		err := db.QueryRow(sqlStatement2,
-			data.Courses[k].ID,
-			data.Courses[k].Ref ,
-			data.Courses[k].Number ,
-			data.Courses[k].Subject,
-			data.Courses[k].Type,
-			data.Courses[k].Title,
-			data.Courses[k].DescriptionUrl,
-			data.Courses[k].Description,
-			data.Courses[k].Credits,
-			data.Courses[k].MaxEnrollment,
-			data.Courses[k].Enrolled,
-			data.Courses[k].Availability,
-			facultyID,
-			MeetingsFacultyID,
-			).Scan(&courseID)
-		if err != nil {
-			panic(err)
-		}	
+										VALUES (:courseId,                
+												:courseReferenceNumber,   
+												:courseNumber,            
+												:subject,                 
+												:scheduleTypeDescription, 
+												:courseTitle,             
+												:descriptionUrl,          
+												:description,             
+												:creditHours,             
+												:maximumEnrollment,       
+												:enrollment,              
+												:seatsAvailable,          
+												:facultyId,               
+												:facultyMeetId,
+												:year)
+							ON CONFLICT ("courseReferenceNumber")
+							DO UPDATE SET 
+										"courseId" = :courseId,                
+										"courseNumber" = :courseNumber,            
+										"subject" = :subject,                 
+										"scheduleTypeDescription" = :scheduleTypeDescription, 
+										"courseTitle" = :courseTitle,             
+										"descriptionUrl" = :descriptionUrl,          
+										"description" = :description,             
+										"creditHours" = :creditHours,             
+										"maximumEnrollment" = :maximumEnrollment,       
+										"enrollment" = :enrollment,              
+										"seatsAvailable" = :seatsAvailable,          
+										"facultyId" = :facultyId,               
+										"facultyMeetId" = :facultyMeetId ,
+										"year" =:year RETURNING id;`
+			 
+			var data1 course = data.Courses[k]
+			data1.Ref = yearString + data1.Ref;
+			data1.FacultyID = facultyID;
+			data1.FacultyMeetID = MeetingsFacultyID
+			data1.Year = yearString
 
+			rows, err := db.NamedQuery(query, data1)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if rows.Next() {
+				rows.Scan(&courseID)
+			}
+			rows.Close()
 
 		//Attributes
 		if(len(data.Courses[k].Attributes) > 0){
 			sectionAttributeID = 0
-			sqlStatement2 := `INSERT INTO "sectionAttribute" ("code", 
-															 "description",
-															 "courseReferenceNumber",
-															 "courseId")
+			query := `INSERT INTO "sectionAttribute" ("code", 
+													"description",
+													"courseReferenceNumber",
+													"courseId",
+													"year")
 
-
-													VALUES ($1,
-															$2,
-															$3,
-															$4 ) RETURNING id;`
-								
-			err := db.QueryRow(sqlStatement2,
-				data.Courses[k].Attributes[0].CodeShort,
-				data.Courses[k].Attributes[0].CodeLong ,
-				data.Courses[k].Attributes[0].Ref ,
-				courseID,
-				).Scan(&sectionAttributeID)
-			if err != nil {
-				panic(err)
-			}	
-		}
+													VALUES (:code,
+															:description,
+															:courseReferenceNumber,
+															:courseId ,
+															:year) 
+													ON CONFLICT ("courseReferenceNumber")
+													DO UPDATE SET 
+																"code" = :code,
+																"description" = :description,                
+																"courseId" = :courseId     ,
+																"year" = :year      
+																  RETURNING id;`
 			
-
-
-		time.Sleep(100 * time.Millisecond) 
+			var data1 attribute = data.Courses[k].Attributes[0]
+			data1.Ref = yearString + data1.Ref;
+			data1.CourseID = courseID;
+			data1.Year = yearString
+			rows, err := db.NamedQuery(query, data1)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if rows.Next() {
+				rows.Scan(&sectionAttributeID)
+			}
+			rows.Close()
+		}
 	}
 }
 
@@ -477,6 +538,7 @@ func requestCourseDescription(index int, data termData, client http.Client, wg *
 	}
 }
 
+
 func main() {
 	var semester, year string
 	var wg sync.WaitGroup
@@ -573,7 +635,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	send_to_db(data)
+	send_to_db(data, semester)
 	
 
 	err = os.WriteFile("courses.json", output, 0644)
