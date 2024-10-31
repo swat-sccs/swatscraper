@@ -13,8 +13,7 @@ Install [Golang](https://go.dev/doc/install)
 ## Usage
 
 ```
-go mod init github.com/swatscraper
-go mod tidy
+go mod download
 go run main.go
 ```
 
