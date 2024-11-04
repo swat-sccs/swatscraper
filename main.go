@@ -129,7 +129,7 @@ func load_envs() {
 	fmt.Println("Successfully connected to DB!")
 }
 
-func send_to_db(data termData, semester string) {
+func send_to_db(data termData, semester string, year string) {
 	var MeetingTimeID int
 	var MeetingsFacultyID int
 	var facultyID int
@@ -137,14 +137,15 @@ func send_to_db(data termData, semester string) {
 	var sectionAttributeID int
 	var yearString string
 
-	t := time.Now()
-	year := t.Year() // type int
+	//t := time.Now()
+	//year := t.Year() // type int
 
 	if strings.ToLower(semester) == "fall" {
-		yearString = "F" + strconv.Itoa(year)
+		yearString = "F" + year
 	} else {
-		yearString = "S" + strconv.Itoa(year)
+		yearString = "S" + year
 	}
+	fmt.Println(yearString)
 
 	//var output int;
 
@@ -540,8 +541,7 @@ func main() {
 	//load_envs()
 	flag.StringVar(&semester,"semester", "fall", "The semster to scrape")
 	flag.StringVar(&year, "year", "2024", "The year to scrape")
-	
-
+	flag.Parse()
 	//fmt.Print("Enter your semester (i.e. fall): ")
 	//fmt.Scan(&semester)
 
@@ -640,7 +640,7 @@ func main() {
 
 	err = os.WriteFile("courses.json", output, 0644)
 
-	send_to_db(data, semester)
+	send_to_db(data, semester, year)
 
 	if err != nil {
 		fmt.Println(err)
