@@ -21,7 +21,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-
 type termData struct {
 	Count   int      `json:"totalCount"`
 	Courses []course `json:"data"`
@@ -36,16 +35,16 @@ type course struct {
 	Title           string            `json:"courseTitle" db:"courseTitle"`
 	DescriptionUrl  string            `json:"" db:"descriptionUrl"`
 	Description     string            `json:"" db:"description"`
-	Credits         float32            `json:"creditHours" db:"creditHours"`
+	Credits         float32           `json:"creditHours" db:"creditHours"`
 	MaxEnrollment   int               `json:"maximumEnrollment" db:"maximumEnrollment"`
 	Enrolled        int               `json:"enrollment" db:"enrollment"`
 	Availability    int               `json:"seatsAvailable" db:"seatsAvailable"`
 	Faculty         []faculty         `json:"faculty"`
 	MeetingsFaculty []meetingsFaculty `json:"meetingsFaculty"`
 	Attributes      []attribute       `json:"sectionAttributes"`
-	Year  string `db:"year"`
-	FacultyID int	`db:"facultyId"`
-	FacultyMeetID int `db:"facultyMeetId"`
+	Year            string            `db:"year"`
+	FacultyID       int               `db:"facultyId"`
+	FacultyMeetID   int               `db:"facultyMeetId"`
 }
 
 type faculty struct {
@@ -57,11 +56,11 @@ type faculty struct {
 }
 
 type meetingsFaculty struct {
-	Section     string `json:"category" db:"category"`
-	Ref         string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
-	Year  string `db:"year"`
-	MeetingTimeID int `db:"meetingTimeID"`
-	MeetingTime meetingTime	
+	Section       string `json:"category" db:"category"`
+	Ref           string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	Year          string `db:"year"`
+	MeetingTimeID int    `db:"meetingTimeID"`
+	MeetingTime   meetingTime
 }
 
 type meetingTime struct {
@@ -74,7 +73,7 @@ type meetingTime struct {
 	EndDate       string  `json:"endDate" db:"endDate"`
 	EndTime       string  `json:"endTime" db:"endTime"`
 	StartDate     string  `json:"startDate" db:"startDate"`
-	Hours         float32  `json:"hoursWeek" db:"hoursWeek"`
+	Hours         float32 `json:"hoursWeek" db:"hoursWeek"`
 	TypeShort     string  `json:"meetingType" db:"meetingType"`
 	TypeLong      string  `json:"meetingTypeDescription" db:"meetingTypeDescription"`
 	Monday        bool    `json:"monday" db:"monday"`
@@ -84,39 +83,37 @@ type meetingTime struct {
 	Friday        bool    `json:"friday" db:"friday"`
 	Saturday      bool    `json:"saturday" db:"saturday"`
 	Sunday        bool    `json:"sunday" db:"sunday"`
-	Year  string `db:"year"`
+	Year          string  `db:"year"`
 }
 
 type attribute struct {
 	CodeShort string `json:"code" db:"code"`
 	CodeLong  string `json:"description" db:"description"`
 	Ref       string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
-	Year  string `db:"year"`
-	CourseID int `db:"courseId"`
+	Year      string `db:"year"`
+	CourseID  int    `db:"courseId"`
 }
 
-type attribute_list struct{
-	attributes []attribute  
+type attribute_list struct {
+	attributes []attribute
 }
 
-
-func load_envs (){
+func load_envs() {
 	// load .env file
 	err := godotenv.Load(".env")
 
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-	
-	var	host     = os.Getenv("HOST")
-	var	port     = 5432
-	var	user     = os.Getenv("SQL_USER")
-	var	password = os.Getenv("PASS")
-	var	dbname   = os.Getenv("DBNAME")
 
+	var host = os.Getenv("HOST")
+	var port = 5432
+	var user = os.Getenv("SQL_USER")
+	var password = os.Getenv("PASS")
+	var dbname = os.Getenv("DBNAME")
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
-    host, port, user, password, dbname)
+		host, port, user, password, dbname)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		panic(err)
@@ -131,23 +128,23 @@ func load_envs (){
 	fmt.Println("Successfully connected to DB!")
 }
 
-func send_to_db(data termData,semester string){
-	var MeetingTimeID int;
-	var MeetingsFacultyID int;
-	var facultyID int;
-	var courseID int;
-	var sectionAttributeID int;
-	var yearString string;
+func send_to_db(data termData, semester string) {
+	var MeetingTimeID int
+	var MeetingsFacultyID int
+	var facultyID int
+	var courseID int
+	var sectionAttributeID int
+	var yearString string
 
 	t := time.Now()
-	year := t.Year()   // type int
+	year := t.Year() // type int
 
-	if(strings.ToLower(semester) == "fall"){
-		yearString  = "F" + strconv.Itoa(year) 
-	}else{
-		yearString  = "S" + strconv.Itoa(year) 
+	if strings.ToLower(semester) == "fall" {
+		yearString = "F" + strconv.Itoa(year)
+	} else {
+		yearString = "S" + strconv.Itoa(year)
 	}
-	
+
 	//var output int;
 
 	// load .env file
@@ -156,21 +153,20 @@ func send_to_db(data termData,semester string){
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
-	
-	var	host     = os.Getenv("HOST")
-	var	port     = 5432
-	var	user     = os.Getenv("SQL_USER")
-	var	password = os.Getenv("PASS")
-	var	dbname   = os.Getenv("DBNAME")
 
-	
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password,dbname)
+	var host = os.Getenv("HOST")
+	var port = 5432
+	var user = os.Getenv("SQL_USER")
+	var password = os.Getenv("PASS")
+	var dbname = os.Getenv("DBNAME")
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	//db, err := sql.Open("postgres", psqlInfo)
 
 	//db, err := sqlx.Connect("postgres", psqlInfo)
 	db := sqlx.MustConnect("postgres", psqlInfo)
 	db.SetMaxOpenConns(80)
-	
+
 	defer db.Close()
 
 	err = db.Ping()
@@ -181,7 +177,7 @@ func send_to_db(data termData,semester string){
 	fmt.Println("Successfully connected to DB!")
 
 	for k := range data.Courses {
-		if(len(data.Courses[k].Faculty) > 0){
+		if len(data.Courses[k].Faculty) > 0 {
 			query := `INSERT INTO "Faculty"("bannerId", 
 													"courseReferenceNumber", 
 													"displayName", 
@@ -196,9 +192,9 @@ func send_to_db(data termData,semester string){
 							ON CONFLICT ("courseReferenceNumber")
 							DO UPDATE SET 
 								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress RETURNING id;`
-			
+
 			var data1 faculty = data.Courses[k].Faculty[0]
-			data1.Ref = yearString + data1.Ref;
+			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
 
 			rows, err := db.NamedQuery(query, data1)
@@ -212,7 +208,7 @@ func send_to_db(data termData,semester string){
 		}
 
 		//Meeting Time
-		if(len(data.Courses[k].MeetingsFaculty) > 0){
+		if len(data.Courses[k].MeetingsFaculty) > 0 {
 			MeetingTimeID = 0
 			query := `INSERT INTO "MeetingTime" ("beginTime", 
 												"building", 
@@ -280,9 +276,8 @@ func send_to_db(data termData,semester string){
 								"year"= :year
 								RETURNING id;`
 
-
 			var data1 meetingTime = data.Courses[k].MeetingsFaculty[0].MeetingTime
-			data1.Ref = yearString + data1.Ref;
+			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
 
 			rows, err := db.NamedQuery(query, data1)
@@ -296,7 +291,7 @@ func send_to_db(data termData,semester string){
 		}
 
 		//Meeting Faculty
-		if(len(data.Courses[k].MeetingsFaculty) > 0){
+		if len(data.Courses[k].MeetingsFaculty) > 0 {
 			MeetingsFacultyID = 0
 			query := `INSERT INTO "MeetingsFaculty" ("category", 
 													"courseReferenceNumber",
@@ -311,9 +306,9 @@ func send_to_db(data termData,semester string){
 							ON CONFLICT ("courseReferenceNumber")
 							DO UPDATE SET 
 								"category" = :category, "meetingTimeID"= :meetingTimeID , "year" = :year RETURNING id;`
-			
+
 			var data1 meetingsFaculty = data.Courses[k].MeetingsFaculty[0]
-			data1.Ref = yearString + data1.Ref;
+			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
 			data1.MeetingTimeID = MeetingTimeID
 
@@ -377,24 +372,24 @@ func send_to_db(data termData,semester string){
 										"facultyId" = :facultyId,               
 										"facultyMeetId" = :facultyMeetId ,
 										"year" =:year RETURNING id;`
-			 
-			var data1 course = data.Courses[k]
-			data1.Ref = yearString + data1.Ref;
-			data1.FacultyID = facultyID;
-			data1.FacultyMeetID = MeetingsFacultyID
-			data1.Year = yearString
 
-			rows, err := db.NamedQuery(query, data1)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if rows.Next() {
-				rows.Scan(&courseID)
-			}
-			rows.Close()
+		var data1 course = data.Courses[k]
+		data1.Ref = yearString + data1.Ref
+		data1.FacultyID = facultyID
+		data1.FacultyMeetID = MeetingsFacultyID
+		data1.Year = yearString
+
+		rows, err := db.NamedQuery(query, data1)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if rows.Next() {
+			rows.Scan(&courseID)
+		}
+		rows.Close()
 
 		//Attributes
-		if(len(data.Courses[k].Attributes) > 0){
+		if len(data.Courses[k].Attributes) > 0 {
 			sectionAttributeID = 0
 			query := `INSERT INTO "sectionAttribute" ("code", 
 													"description",
@@ -414,10 +409,10 @@ func send_to_db(data termData,semester string){
 																"courseId" = :courseId     ,
 																"year" = :year      
 																  RETURNING id;`
-			
+
 			var data1 attribute = data.Courses[k].Attributes[0]
-			data1.Ref = yearString + data1.Ref;
-			data1.CourseID = courseID;
+			data1.Ref = yearString + data1.Ref
+			data1.CourseID = courseID
 			data1.Year = yearString
 			rows, err := db.NamedQuery(query, data1)
 			if err != nil {
@@ -430,7 +425,6 @@ func send_to_db(data termData,semester string){
 		}
 	}
 }
-
 
 func timer(name string) func() {
 	start := time.Now()
@@ -538,7 +532,6 @@ func requestCourseDescription(index int, data termData, client http.Client, wg *
 	}
 }
 
-
 func main() {
 	var semester, year string
 	var wg sync.WaitGroup
@@ -561,10 +554,16 @@ func main() {
 		Jar: jar,
 	}
 
+	var formattedUrl strings.Builder
+
+	formattedUrl.WriteString("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/term/search?mode=search&term=")
+	formattedUrl.WriteString(term)
+	formattedUrl.WriteString("&studyPath=&studyPathText=&startDatepicker=&endDatepicker=&uniqueSessionId=l47z91717271338036")
+
 	client.Get("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/registration")
 	client.Get("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/term/termSelection?mode=search")
 	client.Get("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/classSearch/getTerms?searchTerm=&offset=1&max=10&_=1717271345154")
-	client.Get("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/term/search?mode=search&term=202404&studyPath=&studyPathText=&startDatepicker=&endDatepicker=&uniqueSessionId=l47z91717271338036")
+	client.Get(formattedUrl.String())
 
 	fmt.Println("Hydrated client")
 
@@ -635,10 +634,9 @@ func main() {
 		fmt.Println(err)
 	}
 
-	send_to_db(data, semester)
-	
-
 	err = os.WriteFile("courses.json", output, 0644)
+
+	send_to_db(data, semester)
 
 	if err != nil {
 		fmt.Println(err)
