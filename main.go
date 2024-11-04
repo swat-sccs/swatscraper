@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -537,12 +538,15 @@ func main() {
 	var wg sync.WaitGroup
 
 	//load_envs()
+	flag.StringVar(&semester,"semester", "fall", "The semster to scrape")
+	flag.StringVar(&year, "year", "2024", "The year to scrape")
+	
 
-	fmt.Print("Enter your semester (i.e. fall): ")
-	fmt.Scan(&semester)
+	//fmt.Print("Enter your semester (i.e. fall): ")
+	//fmt.Scan(&semester)
 
-	fmt.Print("Enter your year (i.e. 2024): ")
-	fmt.Scan(&year)
+	//fmt.Print("Enter your year (i.e. 2024): ")
+	//fmt.Scan(&year)
 
 	term := setTerm(semester, year)
 
