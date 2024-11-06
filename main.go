@@ -66,6 +66,8 @@ type meetingsFaculty struct {
 
 type meetingTime struct {
 	Begin         string  `json:"beginTime" db:"beginTime"`
+	BEGINTIME     time.Time	`db:"BEGINTIME"`
+	ENDTIME		  time.Time `db:"ENDTIME"`
 	BuildingShort string  `json:"building" db:"building"`
 	BuildingLong  string  `json:"buildingDescription" db:"buildingDescription"`
 	Room          string  `json:"room" db:"room"`
@@ -279,6 +281,31 @@ func send_to_db(data termData, semester string, year string) {
 								RETURNING id;`
 
 			var data1 meetingTime = data.Courses[k].MeetingsFaculty[0].MeetingTime
+			
+			if (data1.Begin != "" ){
+				var beginTime = data1.Begin
+				//var timeString = "2005-05-15 " + beginTime[0:2] + ":" + beginTime[2:4]+ ":00"
+				hour, _ := strconv.Atoi(beginTime[0:2])
+				min, _ := strconv.Atoi(beginTime[2:4])
+				theTime := time.Date(2005, 05, 15, hour, min, 00, 00, time.UTC)
+				leTime, _ := time.Parse(time.RFC3339Nano, theTime.Format(time.RFC3339))
+				
+
+				data1.BEGINTIME = leTime
+			}
+			if (data1.EndTime != "" ){
+				var EndTime = data1.EndTime
+				//var timeString = "2005-05-15 " + beginTime[0:2] + ":" + beginTime[2:4]+ ":00"
+				hour, _ := strconv.Atoi(EndTime[0:2])
+				min, _ := strconv.Atoi(EndTime[2:4])
+				theTime := time.Date(2005, 05, 15, hour, min, 00, 00, time.UTC)
+				leTime, _ := time.Parse(time.RFC3339, theTime.Format(time.RFC3339))
+				
+				
+				data1.ENDTIME = leTime
+			}
+			
+			
 			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
 
@@ -412,18 +439,22 @@ func send_to_db(data termData, semester string, year string) {
 																"year" = :year      
 																  RETURNING id;`
 
-			var data1 attribute = data.Courses[k].Attributes[0]
-			data1.Ref = yearString + data1.Ref
-			data1.CourseID = courseID
-			data1.Year = yearString
-			rows, err := db.NamedQuery(query, data1)
-			if err != nil {
-				log.Fatalln(err)
-			}
-			if rows.Next() {
-				rows.Scan(&sectionAttributeID)
-			}
-			rows.Close()
+			var data1 = data.Courses[k].Attributes
+			for _, attribute := range data1 {
+				// perform an operation    
+				attribute.Ref = yearString + attribute.Ref
+				attribute.CourseID = courseID
+				attribute.Year = yearString
+				rows, err := db.NamedQuery(query, attribute)
+				if err != nil {
+					log.Fatalln(err)
+				}
+				if rows.Next() {
+					rows.Scan(&sectionAttributeID)
+				}
+				rows.Close()
+			  }
+			
 		}
 	}
 }
