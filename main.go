@@ -183,17 +183,17 @@ func send_to_db(data termData, semester string, year string) {
 	for k := range data.Courses {
 		if len(data.Courses[k].Faculty) > 0 {
 			query := `INSERT INTO "Faculty"("bannerId", 
-													"courseReferenceNumber", 
+
 													"displayName", 
 													"emailAddress",
 													"year")
 
 													VALUES (:bannerId,
-															:courseReferenceNumber,
+
 															:displayName,
 															:emailAddress,
 															:year) 
-							ON CONFLICT ("courseReferenceNumber")
+							ON CONFLICT ("bannerId")
 							DO UPDATE SET 
 								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress RETURNING id;`
 
@@ -440,12 +440,14 @@ func send_to_db(data termData, semester string, year string) {
 																  RETURNING id;`
 
 			var data1 = data.Courses[k].Attributes
-			for _, attribute := range data1 {
+			for z := range data1 {
+				
 				// perform an operation    
-				attribute.Ref = yearString + attribute.Ref
-				attribute.CourseID = courseID
-				attribute.Year = yearString
-				rows, err := db.NamedQuery(query, attribute)
+				data1[z].Ref = yearString + data1[z].Ref + data1[z].CodeShort
+				data1[z].CourseID = courseID
+				data1[z].Year = yearString
+				
+				rows, err = db.NamedQuery(query, data1[z])
 				if err != nil {
 					log.Fatalln(err)
 				}
@@ -454,6 +456,7 @@ func send_to_db(data termData, semester string, year string) {
 				}
 				rows.Close()
 			  }
+			  
 			
 		}
 	}
