@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -28,24 +27,27 @@ type termData struct {
 }
 
 type course struct {
-	ID              int               `json:"id" db:"courseId"`
-	Ref             string            `json:"courseReferenceNumber" db:"courseReferenceNumber"`
-	Number          string            `json:"courseNumber" db:"courseNumber"`
-	Subject         string            `json:"subject" db:"subject"`
-	Type            string            `json:"scheduleTypeDescription" db:"scheduleTypeDescription"`
-	Title           string            `json:"courseTitle" db:"courseTitle"`
-	DescriptionUrl  string            `json:"" db:"descriptionUrl"`
-	Description     string            `json:"" db:"description"`
-	Credits         float32           `json:"creditHours" db:"creditHours"`
-	MaxEnrollment   int               `json:"maximumEnrollment" db:"maximumEnrollment"`
-	Enrolled        int               `json:"enrollment" db:"enrollment"`
-	Availability    int               `json:"seatsAvailable" db:"seatsAvailable"`
-	Faculty         []faculty         `json:"faculty"`
-	MeetingsFaculty []meetingsFaculty `json:"meetingsFaculty"`
-	Attributes      []attribute       `json:"sectionAttributes"`
-	Year            string            `db:"year"`
-	FacultyID       int               `db:"facultyId"`
-	FacultyMeetID   int               `db:"facultyMeetId"`
+	ID               int               `json:"id" db:"courseId"`
+	Ref              string            `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	Number           string            `json:"courseNumber" db:"courseNumber"`
+	Subject          string            `json:"subject" db:"subject"`
+	Type             string            `json:"scheduleTypeDescription" db:"scheduleTypeDescription"`
+	Title            string            `json:"courseTitle" db:"courseTitle"`
+	DescriptionUrl   string            `json:"" db:"descriptionUrl"`
+	Description      string            `json:"" db:"description"`
+	Credits          float32           `json:"creditHours" db:"creditHours"`
+	MaxEnrollment    int               `json:"maximumEnrollment" db:"maximumEnrollment"`
+	Enrolled         int               `json:"enrollment" db:"enrollment"`
+	Availability     int               `json:"seatsAvailable" db:"seatsAvailable"`
+	Faculty          []faculty         `json:"faculty"`
+	MeetingsFaculty  []meetingsFaculty `json:"meetingsFaculty"`
+	Attributes       []attribute       `json:"sectionAttributes"`
+	Year             string            `db:"year"`
+	LinkedSectionUrl string            `json:""`
+	IsSectionLinked  bool              `json:"isSectionLinked"`
+	LinkedSections   string            `db:"linkedSections"`
+	FacultyID        int               `db:"facultyId"`
+	FacultyMeetID    int               `db:"facultyMeetId"`
 }
 
 type faculty struct {
@@ -65,28 +67,34 @@ type meetingsFaculty struct {
 }
 
 type meetingTime struct {
-	Begin         string  `json:"beginTime" db:"beginTime"`
-	BEGINTIME     time.Time	`db:"BEGINTIME"`
-	ENDTIME		  time.Time `db:"ENDTIME"`
-	BuildingShort string  `json:"building" db:"building"`
-	BuildingLong  string  `json:"buildingDescription" db:"buildingDescription"`
-	Room          string  `json:"room" db:"room"`
-	Section       string  `json:"category" db:"category"`
-	Ref           string  `json:"courseReferenceNumber" db:"courseReferenceNumber"`
-	EndDate       string  `json:"endDate" db:"endDate"`
-	EndTime       string  `json:"endTime" db:"endTime"`
-	StartDate     string  `json:"startDate" db:"startDate"`
-	Hours         float32 `json:"hoursWeek" db:"hoursWeek"`
-	TypeShort     string  `json:"meetingType" db:"meetingType"`
-	TypeLong      string  `json:"meetingTypeDescription" db:"meetingTypeDescription"`
-	Monday        bool    `json:"monday" db:"monday"`
-	Tuesday       bool    `json:"tuesday" db:"tuesday"`
-	Wednesday     bool    `json:"wednesday" db:"wednesday"`
-	Thursday      bool    `json:"thursday" db:"thursday"`
-	Friday        bool    `json:"friday" db:"friday"`
-	Saturday      bool    `json:"saturday" db:"saturday"`
-	Sunday        bool    `json:"sunday" db:"sunday"`
-	Year          string  `db:"year"`
+	Begin         string    `json:"beginTime" db:"beginTime"`
+	BEGINTIME     time.Time `db:"BEGINTIME"`
+	ENDTIME       time.Time `db:"ENDTIME"`
+	BuildingShort string    `json:"building" db:"building"`
+	BuildingLong  string    `json:"buildingDescription" db:"buildingDescription"`
+	Room          string    `json:"room" db:"room"`
+	Section       string    `json:"category" db:"category"`
+	Ref           string    `json:"courseReferenceNumber" db:"courseReferenceNumber"`
+	EndDate       string    `json:"endDate" db:"endDate"`
+	EndTime       string    `json:"endTime" db:"endTime"`
+	StartDate     string    `json:"startDate" db:"startDate"`
+	Hours         float32   `json:"hoursWeek" db:"hoursWeek"`
+	TypeShort     string    `json:"meetingType" db:"meetingType"`
+	TypeLong      string    `json:"meetingTypeDescription" db:"meetingTypeDescription"`
+	Monday        bool      `json:"monday" db:"monday"`
+	Tuesday       bool      `json:"tuesday" db:"tuesday"`
+	Wednesday     bool      `json:"wednesday" db:"wednesday"`
+	Thursday      bool      `json:"thursday" db:"thursday"`
+	Friday        bool      `json:"friday" db:"friday"`
+	Saturday      bool      `json:"saturday" db:"saturday"`
+	Sunday        bool      `json:"sunday" db:"sunday"`
+	Year          string    `db:"year"`
+}
+
+type linkedSectionsList struct {
+	LinkedData [][]struct {
+		CourseReferenceNumber string `json:"courseReferenceNumber"`
+	} `json:"linkedData"`
 }
 
 type attribute struct {
@@ -97,40 +105,6 @@ type attribute struct {
 	CourseID  int    `db:"courseId"`
 }
 
-type attribute_list struct {
-	attributes []attribute
-}
-
-func load_envs() {
-	// load .env file
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-	}
-
-	var host = os.Getenv("HOST")
-	var port = 5432
-	var user = os.Getenv("SQL_USER")
-	var password = os.Getenv("PASS")
-	var dbname = os.Getenv("DBNAME")
-
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Successfully connected to DB!")
-}
-
 func send_to_db(data termData, semester string, year string) {
 	var MeetingTimeID int
 	var MeetingsFacultyID int
@@ -139,9 +113,6 @@ func send_to_db(data termData, semester string, year string) {
 	var sectionAttributeID int
 	var yearString string
 
-	//t := time.Now()
-	//year := t.Year() // type int
-
 	if strings.ToLower(semester) == "fall" {
 		yearString = "F" + year
 	} else {
@@ -149,9 +120,6 @@ func send_to_db(data termData, semester string, year string) {
 	}
 	fmt.Println(yearString)
 
-	//var output int;
-
-	// load .env file
 	err := godotenv.Load(".env")
 
 	if err != nil {
@@ -165,9 +133,7 @@ func send_to_db(data termData, semester string, year string) {
 	var dbname = os.Getenv("DBNAME")
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
-	//db, err := sql.Open("postgres", psqlInfo)
 
-	//db, err := sqlx.Connect("postgres", psqlInfo)
 	db := sqlx.MustConnect("postgres", psqlInfo)
 	db.SetMaxOpenConns(80)
 
@@ -281,31 +247,26 @@ func send_to_db(data termData, semester string, year string) {
 								RETURNING id;`
 
 			var data1 meetingTime = data.Courses[k].MeetingsFaculty[0].MeetingTime
-			
-			if (data1.Begin != "" ){
+
+			if data1.Begin != "" {
 				var beginTime = data1.Begin
-				//var timeString = "2005-05-15 " + beginTime[0:2] + ":" + beginTime[2:4]+ ":00"
 				hour, _ := strconv.Atoi(beginTime[0:2])
 				min, _ := strconv.Atoi(beginTime[2:4])
 				theTime := time.Date(2005, 05, 15, hour, min, 00, 00, time.UTC)
 				leTime, _ := time.Parse(time.RFC3339Nano, theTime.Format(time.RFC3339))
-				
 
 				data1.BEGINTIME = leTime
 			}
-			if (data1.EndTime != "" ){
+			if data1.EndTime != "" {
 				var EndTime = data1.EndTime
-				//var timeString = "2005-05-15 " + beginTime[0:2] + ":" + beginTime[2:4]+ ":00"
 				hour, _ := strconv.Atoi(EndTime[0:2])
 				min, _ := strconv.Atoi(EndTime[2:4])
 				theTime := time.Date(2005, 05, 15, hour, min, 00, 00, time.UTC)
 				leTime, _ := time.Parse(time.RFC3339, theTime.Format(time.RFC3339))
-				
-				
+
 				data1.ENDTIME = leTime
 			}
-			
-			
+
 			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
 
@@ -366,7 +327,8 @@ func send_to_db(data termData, semester string, year string) {
 										"seatsAvailable",          
 										"facultyId",               
 										"facultyMeetId",
-										"year"                                      
+										"year",
+										"linkedSections"                          
 										)
 
 
@@ -384,7 +346,9 @@ func send_to_db(data termData, semester string, year string) {
 												:seatsAvailable,          
 												:facultyId,               
 												:facultyMeetId,
-												:year)
+												:year,
+												:linkedSections
+												)
 							ON CONFLICT ("courseReferenceNumber")
 							DO UPDATE SET 
 										"courseId" = :courseId,                
@@ -399,8 +363,9 @@ func send_to_db(data termData, semester string, year string) {
 										"enrollment" = :enrollment,              
 										"seatsAvailable" = :seatsAvailable,          
 										"facultyId" = :facultyId,               
-										"facultyMeetId" = :facultyMeetId ,
-										"year" =:year RETURNING id;`
+										"facultyMeetId" = :facultyMeetId,
+										"linkedSections" = :linkedSections,
+										"year" = :year RETURNING id;`
 
 		var data1 course = data.Courses[k]
 		data1.Ref = yearString + data1.Ref
@@ -437,16 +402,16 @@ func send_to_db(data termData, semester string, year string) {
 																"description" = :description,                
 																"courseId" = :courseId     ,
 																"year" = :year      
-																  RETURNING id;`
+																RETURNING id;`
 
 			var data1 = data.Courses[k].Attributes
 			for z := range data1 {
-				
-				// perform an operation    
+
+				// perform an operation
 				data1[z].Ref = yearString + data1[z].Ref + data1[z].CodeShort
 				data1[z].CourseID = courseID
 				data1[z].Year = yearString
-				
+
 				rows, err = db.NamedQuery(query, data1[z])
 				if err != nil {
 					log.Fatalln(err)
@@ -455,9 +420,8 @@ func send_to_db(data termData, semester string, year string) {
 					rows.Scan(&sectionAttributeID)
 				}
 				rows.Close()
-			  }
-			  
-			
+			}
+
 		}
 	}
 }
@@ -535,6 +499,66 @@ func getCourseDescriptionUrls(term string, data termData) {
 	}
 }
 
+func getCourseLinkedSectionsUrls(term string, data termData) {
+	for i := range data.Courses {
+		var formattedUrl strings.Builder
+
+		formattedUrl.WriteString("https://studentregistration.swarthmore.edu/StudentRegistrationSsb/ssb/searchResults/fetchLinkedSections?term=")
+		formattedUrl.WriteString(term)
+		formattedUrl.WriteString("&courseReferenceNumber=")
+		formattedUrl.WriteString(data.Courses[i].Ref)
+
+		url := formattedUrl.String()
+
+		data.Courses[i].LinkedSectionUrl = url
+	}
+}
+
+func requestCourseLinkedSections(index int, data termData, client http.Client, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	if data.Courses[index].IsSectionLinked {
+		resp, err := client.Get(data.Courses[index].LinkedSectionUrl)
+
+		if err != nil {
+			log.Println(err)
+		}
+
+		if err != nil {
+			fmt.Println("Error fetching linked sections:", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("Error: Received non-200 HTTP status:", resp.StatusCode)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+
+		if err != nil {
+			fmt.Println("Error reading response body:", err)
+			return
+		}
+
+		var linkedSections linkedSectionsList
+
+		if err := json.Unmarshal(body, &linkedSections); err != nil {
+			fmt.Printf("Failed to unmarshal JSON: %v\n", err)
+			return
+		}
+
+		var courseReferenceNumbers []string
+
+		for _, elem := range linkedSections.LinkedData {
+			courseReferenceNumbers = append(courseReferenceNumbers, elem[0].CourseReferenceNumber)
+		}
+
+		data.Courses[index].LinkedSections = strings.Join(courseReferenceNumbers, ",")
+	}
+}
+
 func requestCourseDescription(index int, data termData, client http.Client, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -572,15 +596,9 @@ func main() {
 	var semester, year string
 	var wg sync.WaitGroup
 
-	//load_envs()
-	flag.StringVar(&semester,"semester", "fall", "The semster to scrape")
+	flag.StringVar(&semester, "semester", "fall", "The semster to scrape")
 	flag.StringVar(&year, "year", "2024", "The year to scrape")
 	flag.Parse()
-	//fmt.Print("Enter your semester (i.e. fall): ")
-	//fmt.Scan(&semester)
-
-	//fmt.Print("Enter your year (i.e. 2024): ")
-	//fmt.Scan(&year)
 
 	term := setTerm(semester, year)
 
@@ -644,19 +662,16 @@ func main() {
 	}
 
 	getCourseDescriptionUrls(term, data)
+	getCourseLinkedSectionsUrls(term, data)
 
 	for i := range data.Courses {
-		wg.Add(1)
+		wg.Add(2)
+
 		go requestCourseDescription(i, data, client, &wg)
+		go requestCourseLinkedSections(i, data, client, &wg)
 	}
 
 	wg.Wait()
-
-	// output, err := json.MarshalIndent(data, "", "\t")
-
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
 
 	fmt.Println("Reformatting JSON")
 
@@ -679,5 +694,4 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-
 }
