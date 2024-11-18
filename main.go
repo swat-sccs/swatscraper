@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/gtuk/discordwebhook"
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
@@ -103,6 +105,43 @@ type attribute struct {
 	Ref       string `json:"courseReferenceNumber" db:"courseReferenceNumber"`
 	Year      string `db:"year"`
 	CourseID  int    `db:"courseId"`
+}
+
+type attribute_list struct {
+	attributes []attribute
+}
+
+var semester, year string
+var classCount int
+
+func load_envs() {
+	// load .env file
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
+	var host = os.Getenv("HOST")
+	var port = 5432
+	var user = os.Getenv("SQL_USER")
+	var password = os.Getenv("PASS")
+	var dbname = os.Getenv("DBNAME")
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Successfully connected to DB!")
 }
 
 func send_to_db(data termData, semester string, year string) {
@@ -428,8 +467,66 @@ func send_to_db(data termData, semester string, year string) {
 
 func timer(name string) func() {
 	start := time.Now()
+	//var username = "Scraper Bot"
+	var color = "14177041"
+	var username = "Swat Scraper"
+	var iconURL = "https://images.sidearmdev.com/convert?url=https%3a%2f%2fdxbhsrqyrr690.cloudfront.net%2fsidearm.nextgen.sites%2fswarthmoreathletics.com%2fimages%2f2021%2f5%2f21%2fsc_logo_g2_rgb.png&type=webp"
+	var truer = true;
+	var countTitle = "Course count"
+	var timeName = "Scrape Time"
+	
+
 	return func() {
 		fmt.Printf("%s took %v\n", name, time.Since(start))
+		//var content  = "Scrape of (" + semester + ", " + year + ") took " + time.Since(start).String()
+		var countContent = strconv.Itoa(classCount)
+		var title = semester + ", " + year
+		var timeContent = time.Since(start).String()
+
+		var opMode = "OP Mode"
+		var opModeContent = os.Getenv("OPMODE")
+
+		field := discordwebhook.Field{
+			Name:&timeName,
+			Value:&timeContent,
+			Inline: &truer ,
+		}
+		field2 := discordwebhook.Field{
+			Name:&opMode,
+			Value:&opModeContent,
+			Inline: &truer ,
+		}
+
+		field3 := discordwebhook.Field{
+			Name:&countTitle,
+			Value:&countContent,
+			Inline: &truer ,
+		}
+
+		author := discordwebhook.Author{
+			Name:&username, 
+			IconUrl: &iconURL,
+		}
+
+	
+
+		embed := discordwebhook.Embed{
+			Title: &title,
+			Author: &author,
+			Color: &color,
+			Fields: &[]discordwebhook.Field{field2,field3,field},
+		}
+		
+		message := discordwebhook.Message{
+			Username: &username,
+			Embeds:   &[]discordwebhook.Embed{embed},
+
+		}
+			
+		err := discordwebhook.SendMessage(os.Getenv("WEBHOOK"), message)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
@@ -593,7 +690,7 @@ func requestCourseDescription(index int, data termData, client http.Client, wg *
 }
 
 func main() {
-	var semester, year string
+	
 	var wg sync.WaitGroup
 
 	flag.StringVar(&semester, "semester", "fall", "The semster to scrape")
@@ -656,6 +753,7 @@ func main() {
 		processedCourses += 500
 
 		if processedCourses >= data.Count {
+			classCount = data.Count;
 			fmt.Println("Finished processing:", data.Count, "courses")
 			break
 		}
