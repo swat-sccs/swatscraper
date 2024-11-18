@@ -113,36 +113,6 @@ type attribute_list struct {
 var semester, year string
 var classCount int
 
-func load_envs() {
-	// load .env file
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatalf("Error loading .env file")
-	}
-
-	var host = os.Getenv("HOST")
-	var port = 5432
-	var user = os.Getenv("SQL_USER")
-	var password = os.Getenv("PASS")
-	var dbname = os.Getenv("DBNAME")
-
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Successfully connected to DB!")
-}
-
 func send_to_db(data termData, semester string, year string) {
 	var MeetingTimeID int
 	var MeetingsFacultyID int
