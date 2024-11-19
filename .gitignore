@@ -23,6 +23,7 @@ go.work.sum
 
 # env file
 .env
+scraper.env
 
 # artifacts
 *.json

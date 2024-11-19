@@ -110,7 +110,7 @@ type attribute_list struct {
 	attributes []attribute
 }
 
-var semester, year string
+var semester, year,env_dir string
 var classCount int
 
 func send_to_db(data termData, semester string, year string) {
@@ -128,7 +128,8 @@ func send_to_db(data termData, semester string, year string) {
 	}
 	fmt.Println(yearString)
 
-	err := godotenv.Load(".env")
+
+	err := godotenv.Load(env_dir)
 
 	if err != nil {
 		log.Fatalf("Error loading .env file")
@@ -663,6 +664,7 @@ func main() {
 	var wg sync.WaitGroup
 
 	flag.StringVar(&semester, "semester", "fall", "The semster to scrape")
+	flag.StringVar(&env_dir, "env", ".env", "Where is your env")
 	flag.StringVar(&year, "year", "2024", "The year to scrape")
 	flag.Parse()
 
@@ -756,6 +758,7 @@ func main() {
 
 	err = os.WriteFile("courses.json", output, 0644)
 
+	fmt.Println("Attempting db connection... ")
 	send_to_db(data, semester, year)
 
 	if err != nil {
