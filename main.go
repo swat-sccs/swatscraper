@@ -57,6 +57,7 @@ type faculty struct {
 	Name  string `json:"displayName" db:"displayName"`
 	Email string `json:"emailAddress" db:"emailAddress"`
 	Year  string `db:"year"`
+	Uid   string `db:"uid"`
 }
 
 type meetingsFaculty struct {
@@ -158,23 +159,25 @@ func send_to_db(data termData, semester string, year string) {
 	for k := range data.Courses {
 		if len(data.Courses[k].Faculty) > 0 {
 			query := `INSERT INTO "Faculty"("bannerId", 
+													"uid",
 
 													"displayName", 
 													"emailAddress",
 													"year")
 
 													VALUES (:bannerId,
-
+															:uid,
 															:displayName,
 															:emailAddress,
 															:year) 
-							ON CONFLICT ("bannerId")
+							ON CONFLICT ("uid")
 							DO UPDATE SET 
-								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress RETURNING id;`
+								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress , "uid" =:uid RETURNING id;`
 
 			var data1 faculty = data.Courses[k].Faculty[0]
 			data1.Ref = yearString + data1.Ref
 			data1.Year = yearString
+			data1.Uid = strings.Replace(data1.Name, ", ", "", -1) + data.Courses[k].Subject
 
 			rows, err := db.NamedQuery(query, data1)
 			if err != nil {
