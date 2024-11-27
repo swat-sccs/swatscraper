@@ -170,7 +170,7 @@ func send_to_db(data termData, semester string, year string) {
 															:displayName,
 															:emailAddress,
 															:year) 
-							ON CONFLICT ("bannerId")
+							ON CONFLICT ("uid")
 							DO UPDATE SET 
 								"bannerId" = :bannerId, "displayName"= :displayName, "emailAddress"= :emailAddress , "uid" =:uid RETURNING id;`
 
